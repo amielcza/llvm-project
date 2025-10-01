@@ -1335,7 +1335,7 @@ endif()
 message(WARNING CMAKE_SYSTEM_NAME)
 message(WARNING "TESTING: ${CMAKE_SYSTEM_NAME}")
 if(CMAKE_SYSTEM_NAME MATCHES "Windows")
-  message(WARNING "===========================SYSTEM NAME IS A MATCH ===========================)
+  message(WARNING "===========================SYSTEM NAME IS A MATCH ===========================")
 
   set(CMAKE_EXE_LINKER_FLAGS_RELEASEINTERNAL "${CMAKE_EXE_LINKER_FLAGS}")
   set(CMAKE_MODULE_LINKER_FLAGS_RELEASEINTERNAL "${CMAKE_MODULE_LINKER_FLAGS}")
