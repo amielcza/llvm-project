@@ -897,8 +897,10 @@ bool llvm::hoistRegion(DomTreeNode *N, AAResults *AA, LoopInfo *LI,
                           << '\n');
         // FIXME MSSA: Such replacements may make accesses unoptimized (D51960).
         I.replaceAllUsesWith(C);
-        if (isInstructionTriviallyDead(&I, TLI))
+        if (isInstructionTriviallyDead(&I, TLI)) {
+          salvageDebugInfo(I);
           eraseInstruction(I, *SafetyInfo, MSSAU);
+        }
         Changed = true;
         continue;
       }
@@ -933,13 +935,16 @@ bool llvm::hoistRegion(DomTreeNode *N, AAResults *AA, LoopInfo *LI,
         ReciprocalDivisor->setFastMathFlags(I.getFastMathFlags());
         SafetyInfo->insertInstructionTo(ReciprocalDivisor, I.getParent());
         ReciprocalDivisor->insertBefore(&I);
+        ReciprocalDivisor->setDebugLoc(I.getDebugLoc());
 
         auto Product =
             BinaryOperator::CreateFMul(I.getOperand(0), ReciprocalDivisor);
         Product->setFastMathFlags(I.getFastMathFlags());
         SafetyInfo->insertInstructionTo(Product, I.getParent());
         Product->insertAfter(&I);
+        Product->setDebugLoc(I.getDebugLoc());
         I.replaceAllUsesWith(Product);
+        salvageDebugInfo(I);
         eraseInstruction(I, *SafetyInfo, MSSAU);
 
         hoist(*ReciprocalDivisor, DT, CurLoop, CFH.getOrCreateHoistedBlock(BB),
@@ -1434,6 +1439,9 @@ static Instruction *cloneInstructionInExitBlock(
     New = I.clone();
   }
 
+  // Preserve debug location from the original instruction
+  New->setDebugLoc(I.getDebugLoc());
+
   New->insertInto(&ExitBlock, ExitBlock.getFirstInsertionPt());
   if (!I.getName().empty())
     New->setName(I.getName() + ".le");
@@ -1696,6 +1704,9 @@ static bool sink(Instruction &I, LoopInfo *LI, DominatorTree *DT,
     Instruction *New = sinkThroughTriviallyReplaceablePHI(
         PN, &I, LI, SunkCopies, SafetyInfo, CurLoop, MSSAU);
     PN->replaceAllUsesWith(New);
+    // Salvage debug info from the PHI node before erasing it.
+    // The cloned instruction already has the debug location from the original.
+    salvageDebugInfo(*PN);
     eraseInstruction(*PN, *SafetyInfo, MSSAU);
     Changed = true;
   }
